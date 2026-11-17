@@ -133,6 +133,3 @@ export function buildSearchCondition(
   } as Record<string, unknown>;
 }
 
-export function softDeleteFilter() {
-  return { deletedAt: null };
-}

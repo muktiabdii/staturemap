@@ -8,6 +8,7 @@ export type JwtPayload = {
   sub: string;
   email?: string;
   role?: string;
+  workRegionCode?: string; // VILLAGE-level region code for NAKES; null for ADMIN
   iat?: number;
   exp?: number;
 };

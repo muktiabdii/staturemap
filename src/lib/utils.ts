@@ -1,5 +1,7 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { Prisma } from "@/src/generated/prisma/client";
+import crypto from "crypto";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -38,4 +40,17 @@ export function slugify(text: string): string {
 
 export function formatNumber(value: number): string {
   return new Intl.NumberFormat("id-ID").format(value);
+}
+
+/** Stable SHA-256 hash of a canonical payload (sorted keys, no undefined). */
+export function hashPayload(payload: Record<string, unknown>): string {
+  const canonical = JSON.stringify(payload, Object.keys(payload).sort());
+  return crypto.createHash("sha256").update(canonical).digest("hex");
+}
+
+/** Returns true if the error is a Prisma unique-constraint violation (P2002). */
+export function isUniqueViolation(err: unknown): boolean {
+  return (
+    err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002"
+  );
 }

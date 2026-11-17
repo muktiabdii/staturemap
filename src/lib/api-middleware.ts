@@ -4,6 +4,7 @@ export interface AuthUser {
   id: string;
   email?: string | null;
   role?: string;
+  workRegionCode?: string | null; // VILLAGE-level for NAKES; null for ADMIN
 }
 
 type RouteContext = { params?: Promise<Record<string, string>> };
@@ -37,6 +38,7 @@ async function resolveUser(req: NextRequest): Promise<AuthUser | null> {
       id: payload.sub as string,
       email: payload.email as string | null,
       role: payload.role as string | undefined,
+      workRegionCode: payload.workRegionCode as string | null | undefined,
     };
   } catch {
     return null;
