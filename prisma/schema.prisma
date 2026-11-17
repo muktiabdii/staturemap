@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -12,4 +6,268 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════
+// ENUM
+// ═══════════════════════════════════════
+
+enum UserRole {
+  ADMIN
+  NAKES
+
+  @@map("user_role")
+}
+
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+
+  @@map("account_status")
+}
+
+enum RegionLevel {
+  PROVINCE
+  REGENCY
+  DISTRICT
+  VILLAGE
+
+  @@map("region_level")
+}
+
+enum RecordStatus {
+  ACTIVE
+  INACTIVE
+
+  @@map("record_status")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+
+  @@map("gender")
+}
+
+enum Classification {
+  SEVERELY_STUNTED
+  STUNTED
+  NORMAL
+  TALL
+
+  @@map("classification")
+}
+
+enum LocationSource {
+  GPS
+  MANUAL
+
+  @@map("location_source")
+}
+
+enum RegionResolutionStatus {
+  PENDING
+  RESOLVED
+  UNRESOLVED
+  FAILED
+
+  @@map("region_resolution_status")
+}
+
+enum SyncEntityType {
+  CHILD
+  SCREENING
+
+  @@map("sync_entity_type")
+}
+
+enum ReceiptStatus {
+  ACCEPTED
+  ALREADY_RECEIVED
+  REJECTED
+  CONFLICT
+
+  @@map("receipt_status")
+}
+
+enum ProcessingStatus {
+  NOT_REQUIRED
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+
+  @@map("processing_status")
+}
+
+// ═══════════════════════════════════════
+// ADMINISTRATIVE REGION
+// ═══════════════════════════════════════
+
+model AdministrativeRegion {
+  regionCode  String                                       @id @map("region_code") @db.VarChar(50)
+  regionName  String                                       @map("region_name") @db.VarChar(255)
+  regionLevel RegionLevel                                  @map("region_level")
+  parentCode  String?                                      @map("parent_code") @db.VarChar(50)
+  boundary    Unsupported("geometry(MultiPolygon, 4326)")?
+
+  // Self-referencing relation
+  parent   AdministrativeRegion?  @relation("RegionHierarchy", fields: [parentCode], references: [regionCode], onDelete: Restrict)
+  children AdministrativeRegion[] @relation("RegionHierarchy")
+
+  // Relations
+  users              User[]
+  assignedChildren   Child[]
+  manualScreenings   Screening[] @relation("ManualRegion")
+  resolvedScreenings Screening[] @relation("ResolvedRegion")
+
+  @@index([parentCode])
+  @@index([regionLevel])
+  @@index([boundary], type: Gist)
+  @@map("administrative_regions")
+}
+
+// ═══════════════════════════════════════
+// USER 
+// ═══════════════════════════════════════
+
+model User {
+  userId         String        @id @default(uuid()) @map("user_id") @db.Uuid
+  name           String        @db.VarChar(255)
+  email          String        @unique @db.VarChar(255)
+  passwordHash   String        @map("password_hash") @db.Text
+  role           UserRole
+  accountStatus  AccountStatus @default(ACTIVE) @map("account_status")
+  workRegionCode String?       @map("work_region_code") @db.VarChar(50)
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  workRegion              AdministrativeRegion?    @relation(fields: [workRegionCode], references: [regionCode], onDelete: Restrict)
+  createdChildren         Child[]                  @relation("ChildCreatedBy")
+  updatedChildren         Child[]                  @relation("ChildUpdatedBy")
+  screenings              Screening[]              @relation("ScreeningCreatedBy")
+  syncLogs                SyncLog[]                @relation("SyncSubmittedBy")
+  profileChangeOperations ProfileChangeOperation[]
+
+  @@index([workRegionCode])
+  @@map("users")
+}
+
+// ═══════════════════════════════════════
+// CHILD
+// ═══════════════════════════════════════
+
+model Child {
+  childId            String       @id @map("child_id") @db.Uuid
+  name               String       @db.VarChar(255)
+  dateOfBirth        DateTime     @map("date_of_birth") @db.Date
+  gender             Gender
+  address            String       @db.Text
+  assignedRegionCode String       @map("assigned_region_code") @db.VarChar(50)
+  createdByUserId    String       @map("created_by_user_id") @db.Uuid
+  updatedByUserId    String?      @map("updated_by_user_id") @db.Uuid
+  recordStatus       RecordStatus @default(ACTIVE) @map("record_status")
+  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  assignedRegion          AdministrativeRegion     @relation(fields: [assignedRegionCode], references: [regionCode], onDelete: Restrict)
+  createdBy               User                     @relation("ChildCreatedBy", fields: [createdByUserId], references: [userId], onDelete: Restrict)
+  updatedBy               User?                    @relation("ChildUpdatedBy", fields: [updatedByUserId], references: [userId], onDelete: Restrict)
+  screenings              Screening[]
+  syncLogs                SyncLog[]
+  profileChangeOperations ProfileChangeOperation[]
+
+  @@index([assignedRegionCode, recordStatus])
+  @@index([assignedRegionCode, updatedAt, childId])
+  @@map("children")
+}
+
+// ═══════════════════════════════════════
+// SCREENING
+// ═══════════════════════════════════════
+
+model Screening {
+  screeningId            String                                @id @map("screening_id") @db.Uuid
+  childId                String                                @map("child_id") @db.Uuid
+  createdByUserId        String                                @map("created_by_user_id") @db.Uuid
+  ageMonths              Int                                   @map("age_months")
+  gender                 Gender
+  heightCm               Decimal                               @map("height_cm") @db.Decimal(10, 2)
+  classification         Classification
+  screenedAt             DateTime                              @map("screened_at") @db.Timestamptz(6)
+  locationSource         LocationSource                        @map("location_source")
+  location               Unsupported("geometry(Point, 4326)")?
+  manualRegionCode       String?                               @map("manual_region_code") @db.VarChar(50)
+  resolvedRegionCode     String?                               @map("resolved_region_code") @db.VarChar(50)
+  regionResolutionStatus RegionResolutionStatus                @map("region_resolution_status")
+
+  // Relations
+  child          Child                 @relation(fields: [childId], references: [childId], onDelete: Restrict)
+  createdBy      User                  @relation("ScreeningCreatedBy", fields: [createdByUserId], references: [userId], onDelete: Restrict)
+  manualRegion   AdministrativeRegion? @relation("ManualRegion", fields: [manualRegionCode], references: [regionCode], onDelete: Restrict)
+  resolvedRegion AdministrativeRegion? @relation("ResolvedRegion", fields: [resolvedRegionCode], references: [regionCode], onDelete: Restrict)
+  syncLogs       SyncLog[]
+
+  @@index([childId, screenedAt])
+  @@index([resolvedRegionCode, screenedAt])
+  @@index([classification])
+  @@index([location], type: Gist)
+  @@map("screenings")
+}
+
+// ═══════════════════════════════════════
+// SYNC LOG
+// ═══════════════════════════════════════
+
+model SyncLog {
+  syncLogId             String           @id @default(uuid()) @map("sync_log_id") @db.Uuid
+  submittedByUserId     String           @map("submitted_by_user_id") @db.Uuid
+  entityType            SyncEntityType   @map("entity_type")
+  requestEntityId       String           @map("request_entity_id") @db.Uuid
+  changeId              String?          @map("change_id") @db.Uuid
+  payloadHash           String?          @map("payload_hash") @db.VarChar(255)
+  childId               String?          @map("child_id") @db.Uuid
+  screeningId           String?          @map("screening_id") @db.Uuid
+  receiptStatus         ReceiptStatus    @map("receipt_status")
+  processingStatus      ProcessingStatus @map("processing_status")
+  receivedAt            DateTime         @default(now()) @map("received_at") @db.Timestamptz(6)
+  processingStartedAt   DateTime?        @map("processing_started_at") @db.Timestamptz(6)
+  processingCompletedAt DateTime?        @map("processing_completed_at") @db.Timestamptz(6)
+  errorCode             String?          @map("error_code") @db.VarChar(100)
+  errorMessage          String?          @map("error_message") @db.Text
+
+  // Relations
+  submittedBy User       @relation("SyncSubmittedBy", fields: [submittedByUserId], references: [userId], onDelete: Restrict)
+  child       Child?     @relation(fields: [childId], references: [childId], onDelete: Restrict)
+  screening   Screening? @relation(fields: [screeningId], references: [screeningId], onDelete: Restrict)
+
+  @@index([submittedByUserId, receivedAt])
+  @@index([entityType, requestEntityId])
+  @@index([changeId])
+  @@index([childId])
+  @@index([screeningId])
+  @@index([receiptStatus, processingStatus])
+  @@map("sync_logs")
+}
+
+// ═══════════════════════════════════════
+// PROFILE CHANGE OPERATION
+// ═══════════════════════════════════════
+
+model ProfileChangeOperation {
+  changeId          String   @id @map("change_id") @db.Uuid
+  childId           String   @map("child_id") @db.Uuid
+  submittedByUserId String   @map("submitted_by_user_id") @db.Uuid
+  payloadHash       String   @map("payload_hash") @db.VarChar(255)
+  appliedAt         DateTime @default(now()) @map("applied_at") @db.Timestamptz(6)
+
+  // Relations
+  child       Child @relation(fields: [childId], references: [childId], onDelete: Restrict)
+  submittedBy User  @relation(fields: [submittedByUserId], references: [userId], onDelete: Restrict)
+
+  @@index([childId])
+  @@index([submittedByUserId])
+  @@map("profile_change_operations")
 }
