@@ -105,14 +105,17 @@ enum ProcessingStatus {
 // ═══════════════════════════════════════
 
 model AdministrativeRegion {
-  regionCode  String                                       @id @map("region_code") @db.VarChar(50)
-  regionName  String                                       @map("region_name") @db.VarChar(255)
-  regionLevel RegionLevel                                  @map("region_level")
-  parentCode  String?                                      @map("parent_code") @db.VarChar(50)
-  boundary    Unsupported("geometry(MultiPolygon, 4326)")?
+  id          String                                      @id @default(uuid()) @db.Uuid
+  regionCode  String                                      @unique @map("region_code") @db.VarChar(50)
+  regionName  String                                      @map("region_name") @db.VarChar(255)
+  regionLevel RegionLevel                                 @map("region_level")
+  parentId    String?                                     @map("parent_id") @db.Uuid
+  boundary    Unsupported("geometry(MultiPolygon, 4326)")
+  createdAt   DateTime                                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime                                    @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Self-referencing relation
-  parent   AdministrativeRegion?  @relation("RegionHierarchy", fields: [parentCode], references: [regionCode], onDelete: Restrict)
+  parent   AdministrativeRegion?  @relation("RegionHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
   children AdministrativeRegion[] @relation("RegionHierarchy")
 
   // Relations
@@ -121,7 +124,7 @@ model AdministrativeRegion {
   manualScreenings   Screening[] @relation("ManualRegion")
   resolvedScreenings Screening[] @relation("ResolvedRegion")
 
-  @@index([parentCode])
+  @@index([parentId])
   @@index([regionLevel])
   @@index([boundary], type: Gist)
   @@map("administrative_regions")
@@ -132,25 +135,25 @@ model AdministrativeRegion {
 // ═══════════════════════════════════════
 
 model User {
-  userId         String        @id @default(uuid()) @map("user_id") @db.Uuid
-  name           String        @db.VarChar(255)
-  email          String        @unique @db.VarChar(255)
-  passwordHash   String        @map("password_hash") @db.Text
-  role           UserRole
-  accountStatus  AccountStatus @default(ACTIVE) @map("account_status")
-  workRegionCode String?       @map("work_region_code") @db.VarChar(50)
-  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  userId        String        @id @default(uuid()) @map("user_id") @db.Uuid
+  name          String        @db.VarChar(255)
+  email         String        @unique @db.VarChar(255)
+  passwordHash  String        @map("password_hash") @db.Text
+  role          UserRole
+  accountStatus AccountStatus @default(ACTIVE) @map("account_status")
+  workRegionId  String?       @map("work_region_id") @db.Uuid
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
-  workRegion              AdministrativeRegion?    @relation(fields: [workRegionCode], references: [regionCode], onDelete: Restrict)
+  workRegion              AdministrativeRegion?    @relation(fields: [workRegionId], references: [id], onDelete: Restrict)
   createdChildren         Child[]                  @relation("ChildCreatedBy")
   updatedChildren         Child[]                  @relation("ChildUpdatedBy")
   screenings              Screening[]              @relation("ScreeningCreatedBy")
   syncLogs                SyncLog[]                @relation("SyncSubmittedBy")
   profileChangeOperations ProfileChangeOperation[]
 
-  @@index([workRegionCode])
+  @@index([workRegionId])
   @@map("users")
 }
 
@@ -159,28 +162,28 @@ model User {
 // ═══════════════════════════════════════
 
 model Child {
-  childId            String       @id @map("child_id") @db.Uuid
-  name               String       @db.VarChar(255)
-  dateOfBirth        DateTime     @map("date_of_birth") @db.Date
-  gender             Gender
-  address            String       @db.Text
-  assignedRegionCode String       @map("assigned_region_code") @db.VarChar(50)
-  createdByUserId    String       @map("created_by_user_id") @db.Uuid
-  updatedByUserId    String?      @map("updated_by_user_id") @db.Uuid
-  recordStatus       RecordStatus @default(ACTIVE) @map("record_status")
-  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  childId          String       @id @map("child_id") @db.Uuid
+  name             String       @db.VarChar(255)
+  dateOfBirth      DateTime     @map("date_of_birth") @db.Date
+  gender           Gender
+  address          String       @db.Text
+  assignedRegionId String?      @map("assigned_region_id") @db.Uuid
+  createdByUserId  String       @map("created_by_user_id") @db.Uuid
+  updatedByUserId  String?      @map("updated_by_user_id") @db.Uuid
+  recordStatus     RecordStatus @default(ACTIVE) @map("record_status")
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Relations
-  assignedRegion          AdministrativeRegion     @relation(fields: [assignedRegionCode], references: [regionCode], onDelete: Restrict)
+  assignedRegion          AdministrativeRegion?    @relation(fields: [assignedRegionId], references: [id], onDelete: Restrict)
   createdBy               User                     @relation("ChildCreatedBy", fields: [createdByUserId], references: [userId], onDelete: Restrict)
   updatedBy               User?                    @relation("ChildUpdatedBy", fields: [updatedByUserId], references: [userId], onDelete: Restrict)
   screenings              Screening[]
   syncLogs                SyncLog[]
   profileChangeOperations ProfileChangeOperation[]
 
-  @@index([assignedRegionCode, recordStatus])
-  @@index([assignedRegionCode, updatedAt, childId])
+  @@index([assignedRegionId, recordStatus])
+  @@index([assignedRegionId, updatedAt, childId])
   @@map("children")
 }
 
@@ -199,19 +202,19 @@ model Screening {
   screenedAt             DateTime                              @map("screened_at") @db.Timestamptz(6)
   locationSource         LocationSource                        @map("location_source")
   location               Unsupported("geometry(Point, 4326)")?
-  manualRegionCode       String?                               @map("manual_region_code") @db.VarChar(50)
-  resolvedRegionCode     String?                               @map("resolved_region_code") @db.VarChar(50)
+  manualRegionId         String?                               @map("manual_region_id") @db.Uuid
+  resolvedRegionId       String?                               @map("resolved_region_id") @db.Uuid
   regionResolutionStatus RegionResolutionStatus                @map("region_resolution_status")
 
   // Relations
   child          Child                 @relation(fields: [childId], references: [childId], onDelete: Restrict)
   createdBy      User                  @relation("ScreeningCreatedBy", fields: [createdByUserId], references: [userId], onDelete: Restrict)
-  manualRegion   AdministrativeRegion? @relation("ManualRegion", fields: [manualRegionCode], references: [regionCode], onDelete: Restrict)
-  resolvedRegion AdministrativeRegion? @relation("ResolvedRegion", fields: [resolvedRegionCode], references: [regionCode], onDelete: Restrict)
+  manualRegion   AdministrativeRegion? @relation("ManualRegion", fields: [manualRegionId], references: [id], onDelete: Restrict)
+  resolvedRegion AdministrativeRegion? @relation("ResolvedRegion", fields: [resolvedRegionId], references: [id], onDelete: Restrict)
   syncLogs       SyncLog[]
 
   @@index([childId, screenedAt])
-  @@index([resolvedRegionCode, screenedAt])
+  @@index([resolvedRegionId, screenedAt])
   @@index([classification])
   @@index([location], type: Gist)
   @@map("screenings")
