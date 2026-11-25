@@ -54,7 +54,7 @@ export function ssoAuth(handler: AuthenticatedHandler) {
     const authUser = await resolveUser(req);
     if (!authUser) {
       return NextResponse.json(
-        { error: "Unauthorized", statusCode: 401 },
+        { message: "Unauthorized", statusCode: 401 },
         { status: 401 }
       );
     }
@@ -70,7 +70,7 @@ export function role(allowedRoles: string[], handler: AuthenticatedHandler) {
   return ssoAuth(async (req, ctx, authUser) => {
     if (!authUser.role || !allowedRoles.includes(authUser.role)) {
       return NextResponse.json(
-        { error: "Forbidden", statusCode: 403 },
+        { message: "Forbidden", statusCode: 403 },
         { status: 403 }
       );
     }
