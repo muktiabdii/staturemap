@@ -3,9 +3,6 @@ import { verifyToken } from "@/src/lib/auth-utils";
 import { UserRepository } from "@/src/server/repositories";
 import { ACCOUNT_STATUS } from "@/src/constants/common";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-/** Identity sourced from the database, not from JWT claims. */
 export interface AuthUser {
   id: string;
   name: string;
@@ -31,8 +28,6 @@ type OptionalAuthHandler = (
 export const ADMIN_ROLES = ["ADMIN"];
 export const NAKES_ROLES = ["NAKES"];
 export const ALL_ROLES = ["ADMIN", "NAKES"];
-
-// ─── Identity resolution ─────────────────────────────────────────────────────
 
 const userRepo = new UserRepository();
 
@@ -75,8 +70,6 @@ async function resolveUser(
     },
   };
 }
-
-// ─── Middleware wrappers ──────────────────────────────────────────────────────
 
 /**
  * ssoAuth — Mandatory authentication. Validates token AND account status via DB.

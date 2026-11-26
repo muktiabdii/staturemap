@@ -33,7 +33,6 @@ export class AuthService {
   static async login(input: LoginInput): Promise<LoginResult> {
     const user = await userRepo.findByEmail(input.email);
 
-    // Use identical response for "not found" and "wrong password" (no user enumeration)
     if (!user || !(await verifyPassword(user.passwordHash, input.password))) {
       throw new AuthError(401, "Email atau password salah");
     }
@@ -42,7 +41,6 @@ export class AuthService {
       throw new AuthError(403, "Akun tidak aktif");
     }
 
-    // Derive work_region_code from the authenticated record — never trust client input
     const workRegionCode = AuthService.resolveWorkRegionCode(user);
 
     const token = await signToken({
@@ -52,8 +50,6 @@ export class AuthService {
       workRegionCode,
     });
 
-    // Decode the token to get the actual exp set by signToken, so expires_at
-    // is always consistent with what was signed regardless of JWT_EXPIRES_IN.
     const expiresAt = AuthService.expiresAtFromToken(token);
 
     return {
@@ -101,7 +97,6 @@ export class AuthService {
     } catch {
       // fall through to fallback
     }
-    // Fallback: 7 days from now — should never be reached in practice
     return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   }
 }

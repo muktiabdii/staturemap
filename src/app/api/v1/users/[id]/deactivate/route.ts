@@ -4,7 +4,6 @@ import { apiResponse, errorResponse } from "@/src/lib/api-utils";
 import { UserService, UserError } from "@/src/server/services";
 
 // POST /api/v1/users/[id]/deactivate — deactivate a NAKES account (Admin only)
-// Idempotent: safe to call on an already-inactive account.
 export const POST = role(ADMIN_ROLES, async (_req: NextRequest, ctx) => {
   const params = await ctx.params;
   const id = params?.id as string;

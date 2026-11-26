@@ -20,6 +20,7 @@ export class UserError extends Error {
 }
 
 export class UserService {
+  
   /** Paginated list of NAKES accounts with optional name/email search. */
   static async listNakes(options: {
     page: number;

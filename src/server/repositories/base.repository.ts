@@ -132,9 +132,6 @@ export abstract class BaseRepository<T = unknown> {
     return this.model.update(queryOptions);
   }
 
-  /**
-   * Permanently delete a record.
-   */
   async delete(id: string): Promise<T> {
     return this.model.delete({
       where: { id },

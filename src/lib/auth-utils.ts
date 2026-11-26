@@ -1,13 +1,11 @@
 import { SignJWT, jwtVerify } from "jose";
 import { hash, verify, argon2id } from "argon2";
 
-// ─── JWT ────────────────────────────────────────────────────────────────────
-
 export type JwtPayload = {
   sub: string;
   email?: string;
   role?: string;
-  workRegionCode?: string | null; // VILLAGE-level region code for NAKES; null for ADMIN
+  workRegionCode?: string | null;
   iat?: number;
   exp?: number;
 };
@@ -25,7 +23,6 @@ function getSecret(): Uint8Array {
   return new TextEncoder().encode(raw);
 }
 
-/** Default token lifetime. Change JWT_EXPIRES_IN in .env to override (jose duration string, e.g. "1d", "8h"). */
 const DEFAULT_EXPIRES_IN = "7d";
 
 export async function signToken(
@@ -49,7 +46,6 @@ export async function verifyToken(token: string): Promise<JwtPayload | null> {
       algorithms: ["HS256"],
     });
 
-    // sub is mandatory — tokens without it are considered invalid
     if (typeof payload.sub !== "string" || !payload.sub) return null;
 
     return payload as unknown as JwtPayload;
@@ -57,8 +53,6 @@ export async function verifyToken(token: string): Promise<JwtPayload | null> {
     return null;
   }
 }
-
-// ─── Password ────────────────────────────────────────────────────────────────
 
 /**
  * Argon2id options — OWASP recommended minimum:
