@@ -1,4 +1,5 @@
 
+import { PrismaClient } from "@prisma/client";
 import { prisma } from "@/src/lib/prisma";
 
 export type PaginationOptions = {
@@ -28,10 +29,8 @@ export abstract class BaseRepository<T = unknown> {
     return prisma;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  protected get model(): any {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (this.prisma as any)[this.modelName];
+  protected get model(): PrismaClient[keyof PrismaClient] {
+    return (this.prisma as PrismaClient)[this.modelName as keyof PrismaClient];
   }
 
   async findMany(options: PaginationOptions): Promise<PaginatedResult<T>> {
