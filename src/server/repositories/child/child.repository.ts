@@ -31,16 +31,16 @@ export type ApplyChangeResult =
 export type ChildPullItem = {
   child_id: string;
   name: string;
-  date_of_birth: string;   // ISO date string "YYYY-MM-DD"
+  date_of_birth: string;
   gender: string;
   address: string;
   record_status: string;
-  updated_at: string;      // ISO timestamp — also used for cursor position
+  updated_at: string;
 };
 
 // Decoded cursor position used internally for keyset pagination
 export type PullCursor = {
-  updatedAt: string; // ISO timestamp
+  updatedAt: string;
   childId: string;
 };
 
@@ -61,12 +61,9 @@ export class ChildRepository extends BaseRepository<Child> {
   /**
    * Fetches a page of children for a Nakes's work region using keyset pagination.
    *
-   * Ordering: (updatedAt ASC, childId ASC) — deterministic across ties.
    * When a cursor is provided, only records strictly after the cursor position
    * are returned. This prevents data loss when multiple records share the same
    * updatedAt timestamp.
-   *
-   * The index @@index([assignedRegionId, updatedAt, childId]) covers this query.
    */
   async findForPull(
     assignedRegionId: string,
@@ -83,9 +80,6 @@ export class ChildRepository extends BaseRepository<Child> {
       updated_at: Date;
     };
 
-    // Keyset pagination with compound (updatedAt, childId) ordering.
-    // Prisma does not support multi-column cursor natively, so we use $queryRaw.
-    // All values are parameterized — no string concatenation.
     let rows: RawRow[];
 
     if (cursor) {
@@ -141,13 +135,11 @@ export class ChildRepository extends BaseRepository<Child> {
    * - "ACCEPTED" if the change was applied.
    * - "ALREADY_RECEIVED" if the same changeId with the same payloadHash already exists.
    * - "CONFLICT" if the same changeId with a different payloadHash exists.
-   *
-   * The assignedRegionId is set only on create (new child), never on update.
-   * On update, only name, dateOfBirth, gender, address, and updatedByUserId are changed.
    */
   async applyChange(input: ApplyChangeInput): Promise<ApplyChangeResult> {
     try {
       await prisma.$transaction(async (tx) => {
+
         // 1. Insert ProfileChangeOperation — changeId is PK, so duplicate throws P2002
         await tx.profileChangeOperation.create({
           data: {
@@ -177,7 +169,6 @@ export class ChildRepository extends BaseRepository<Child> {
             gender: input.data.gender,
             address: input.data.address,
             updatedByUserId: input.submittedByUserId,
-            // assignedRegionId is NOT updated — it stays as originally assigned
           },
         });
       });
@@ -185,6 +176,7 @@ export class ChildRepository extends BaseRepository<Child> {
       return { status: "ACCEPTED" };
     } catch (err) {
       if (isUniqueViolation(err)) {
+
         // changeId already exists — check if the payload is the same or different
         const existing = await prisma.profileChangeOperation.findUnique({
           where: { changeId: input.changeId },
@@ -192,7 +184,6 @@ export class ChildRepository extends BaseRepository<Child> {
         });
 
         if (!existing) {
-          // Should not happen (we just got P2002), but handle defensively
           throw err;
         }
 
@@ -203,7 +194,6 @@ export class ChildRepository extends BaseRepository<Child> {
         }
       }
 
-      // Any other error — re-throw
       throw err;
     }
   }

@@ -84,6 +84,7 @@ export class ScreeningRepository extends BaseRepository<Screening> {
    * from the validated payload (same hash confirmed before this call).
    */
   async findGpsForRetry(screeningId: string): Promise<{ syncLogId: string } | null> {
+
     // Confirm the screening row exists and is GPS-sourced
     const screening = await this.model.findUnique({
       where: { screeningId },
@@ -162,6 +163,7 @@ export class ScreeningRepository extends BaseRepository<Screening> {
           });
         });
       } else {
+
         // GPS: $executeRaw for Unsupported geometry column, then insert SyncLog
         // in the same interactive transaction.
         await prisma.$transaction(async (tx) => {
@@ -219,6 +221,7 @@ export class ScreeningRepository extends BaseRepository<Screening> {
         const existing = await this.findIdempotencyRecord(input.screeningId);
 
         if (!existing) {
+          
           // Race condition: PK exists but SyncLog not yet committed — treat as duplicate
           return { status: "ALREADY_RECEIVED", processingStatus: "NOT_REQUIRED" };
         }

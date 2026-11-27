@@ -87,6 +87,7 @@ export class SyncService {
     workRegion: { id: string; regionCode: string } | null,
     raw: unknown
   ): Promise<ChildItemResult> {
+
     // 1. Shape validation
     const parsed = pushChildSchema.safeParse(raw);
     if (!parsed.success) {
@@ -171,6 +172,7 @@ export class SyncService {
     rejectedChildIds: Set<string>,
     raw: unknown
   ): Promise<ScreeningItemResult> {
+
     // 1. Shape validation
     const parsed = pushScreeningSchema.safeParse(raw);
     if (!parsed.success) {
@@ -420,6 +422,7 @@ export class SyncService {
     longitude: number
   ): Promise<ScreeningItemResult> {
     try {
+
       // Deterministic jobId prevents duplicate queue entries if two requests
       // race to enqueue the same screening — BullMQ silently drops the second.
       await regionResolutionQueue.add(
@@ -460,6 +463,7 @@ export class SyncService {
     const deterministicJobId = `gps-${screeningId}`;
 
     try {
+
       // If a finished (completed or failed) job still occupies this jobId in
       // Redis, remove it so the new add is not silently dropped as a duplicate.
       const existingJob = await regionResolutionQueue.getJob(deterministicJobId);
@@ -468,6 +472,7 @@ export class SyncService {
         if (state === "completed" || state === "failed") {
           await existingJob.remove();
         } else if (state === "active" || state === "waiting" || state === "delayed") {
+
           // A live job already exists — it will be processed, treat as PENDING
           return SyncService.screeningResult(screeningId, "ACCEPTED", "PENDING", null, null);
         }
@@ -497,6 +502,7 @@ export class SyncService {
 
       return SyncService.screeningResult(screeningId, "ACCEPTED", "PENDING", null, null);
     } catch {
+
       // Retry failed — keep existing FAILED status, do not create a new SyncLog
       return SyncService.screeningResult(
         screeningId, "ACCEPTED", "FAILED", "QUEUE_ENQUEUE_FAILED", null
@@ -508,6 +514,7 @@ export class SyncService {
     screeningId: string,
     syncLogId: string
   ): Promise<void> {
+    
     // Update regionResolutionStatus on the screening row to FAILED
     try {
       const { prisma } = await import("@/src/lib/prisma");

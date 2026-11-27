@@ -7,14 +7,9 @@ import type { AuthUser } from "@/src/lib/api-middleware";
 // GET /api/v1/sync/pull?cursor={cursor}
 // Returns incremental child profile changes for the authenticated Nakes's work region.
 // Cursor is opaque base64url; omit entirely for initial sync.
-//
-// 400 if cursor is provided but cannot be decoded.
-// 401/403 from role() middleware.
-// Response is not wrapped in apiResponse() (sync contract exception).
 export const GET = role(NAKES_ROLES, async (req: NextRequest, _ctx, authUser: AuthUser) => {
   const rawCursor = req.nextUrl.searchParams.get("cursor");
 
-  // Distinguish "no cursor" (initial sync) from "cursor present but invalid" (400)
   if (rawCursor !== null) {
     const decoded = PullService.decodeCursor(rawCursor);
     if (decoded === null) {

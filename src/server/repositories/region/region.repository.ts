@@ -50,6 +50,7 @@ export class RegionRepository extends BaseRepository {
    * ordered from root (PROVINCE) down to VILLAGE.
    */
   async findRegionWithAncestors(regionCode: string): Promise<RegionItem[]> {
+
     // Walk up the hierarchy: start from the village region, follow parentId links.
     const collected: RegionItem[] = [];
     let current: (RegionItem & { id: string; parentId: string | null }) | null =
@@ -72,7 +73,6 @@ export class RegionRepository extends BaseRepository {
       }) as typeof current;
     }
 
-    // Reverse so that PROVINCE comes first, VILLAGE last
     return collected.reverse();
   }
 }

@@ -92,6 +92,7 @@ export class PullService {
         return null;
       }
       const { updatedAt, childId } = parsed as PullCursor;
+      
       // Validate that updatedAt parses to a real date to prevent bad SQL params
       if (isNaN(new Date(updatedAt).getTime())) return null;
       return { updatedAt, childId };

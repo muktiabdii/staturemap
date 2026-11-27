@@ -9,10 +9,6 @@ import type { AuthUser } from "@/src/lib/api-middleware";
 // Accepts a batch of child profile changes and screenings from a Nakes device.
 // Children are processed first; screenings whose child was rejected in this
 // batch are rejected immediately without further DB access.
-//
-// Response: HTTP 200 with per-entity results (not apiResponse — sync contract).
-// 400 on malformed body or batch limit exceeded (checked by pushSyncSchema).
-// 401/403 from role() middleware.
 export const POST = role(NAKES_ROLES, async (req: NextRequest, _ctx, authUser: AuthUser) => {
   let body: unknown;
   try {
@@ -48,9 +44,6 @@ export const POST = role(NAKES_ROLES, async (req: NextRequest, _ctx, authUser: A
     rejectedChildIds
   );
 
-  // Sync push returns a flat results array — not wrapped in apiResponse.
-  // This is the documented exception to the standard response format
-  // (see AGENTS.md and docs/domain-rules.md §8).
   return NextResponse.json(
     {
       results: {

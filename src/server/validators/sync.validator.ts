@@ -37,8 +37,10 @@ export const pushScreeningSchema = z
     ),
     screened_at: z.iso.datetime({ error: "Format screened_at tidak valid (ISO 8601)" }),
     location_source: z.enum(["GPS", "MANUAL"], { error: "location_source harus GPS atau MANUAL" }),
+
     // GPS-only: required when location_source = GPS, must be absent for MANUAL
     location: locationGpsSchema.optional(),
+
     // MANUAL-only: required when location_source = MANUAL, must be absent for GPS
     manual_region_code: z.string().min(1).max(50).optional(),
   })
@@ -59,6 +61,7 @@ export const pushScreeningSchema = z
         });
       }
     } else {
+      
       // MANUAL
       if (data.manual_region_code === undefined) {
         ctx.addIssue({
