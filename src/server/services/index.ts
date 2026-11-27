@@ -7,4 +7,5 @@ export { PullService } from "./sync/pull.service";
 export type { PullResult } from "./sync/pull.service";
 export { MapService } from "./map/map.service";
 export type { PublicAggregationItem, PublicLevel } from "./map/map.service";
+export { ChildService, ChildError } from "./child/child.service";
 
