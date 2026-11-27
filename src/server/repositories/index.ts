@@ -5,4 +5,6 @@ export type { ChildForValidation, ApplyChangeInput, ApplyChangeResult, ChildPull
 export { ScreeningRepository } from "./screening/screening.repository";
 export type { ScreeningIdempotencyRecord, InsertScreeningInput, InsertScreeningResult, ScreeningSyncLogData, GpsRetryData, AggregationRow, AdminStatsFilter, AdminStatsResult } from "./screening/screening.repository";
 export { SyncLogRepository } from "./sync/sync-log.repository";
-export type { CreateSyncLogInput } from "./sync/sync-log.repository";
+export type { CreateSyncLogInput, AdminSyncLogItem, AdminSyncLogFilter } from "./sync/sync-log.repository";
+export { SpatialRepository } from "./spatial.repository";
+export type { AdminMapMarker } from "./spatial.repository";

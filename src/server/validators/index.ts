@@ -4,4 +4,5 @@ export * from "./reference.validator";
 export * from "./sync.validator";
 export * from "./map.validator";
 export * from "./admin-child.validator";
+export * from "./admin-synclog.validator";
 

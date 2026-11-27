@@ -17,6 +17,48 @@ export type CreateSyncLogInput = {
   errorMessage?: string | null;
 };
 
+// Filters for Admin SyncLog list
+export type AdminSyncLogFilter = {
+  entityType?: string;
+  receiptStatus?: string;
+  processingStatus?: string;
+  submittedByUserId?: string;
+  from?: Date;
+  to?: Date;
+};
+
+// Safe shape for Admin monitoring — no payloadHash, no childId, no screeningId detail
+export type AdminSyncLogItem = {
+  syncLogId: string;
+  submittedByUserId: string;
+  entityType: string;
+  requestEntityId: string;
+  changeId: string | null;
+  receiptStatus: string;
+  processingStatus: string;
+  receivedAt: Date;
+  processingStartedAt: Date | null;
+  processingCompletedAt: Date | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+};
+
+const ADMIN_SYNC_LOG_SELECT = {
+  syncLogId: true,
+  submittedByUserId: true,
+  entityType: true,
+  requestEntityId: true,
+  changeId: true,
+  receiptStatus: true,
+  processingStatus: true,
+  receivedAt: true,
+  processingStartedAt: true,
+  processingCompletedAt: true,
+  errorCode: true,
+  errorMessage: true,
+  // payloadHash, childId, screeningId intentionally excluded — monitoring only
+} as const;
+
 export class SyncLogRepository extends BaseRepository<SyncLog> {
   protected modelName = "syncLog";
 
@@ -50,8 +92,8 @@ export class SyncLogRepository extends BaseRepository<SyncLog> {
   }
 
   /**
-   * Updates processingStatus and optionally errorCode/errorMessage on an
-   * existing SyncLog row. Used to finalize GPS screening logs after enqueue.
+   * Updates processingStatus and optionally errorCode on an existing SyncLog.
+   * Used to finalize GPS screening logs after enqueue.
    */
   async updateProcessingStatus(
     syncLogId: string,
@@ -65,5 +107,45 @@ export class SyncLogRepository extends BaseRepository<SyncLog> {
         ...(errorCode !== undefined ? { errorCode } : {}),
       },
     });
+  }
+
+  /**
+   * Paginated SyncLog list for Admin monitoring.
+   * Returns technical fields only — no payloadHash or raw entity data.
+   */
+  async findManyAdmin(
+    filter: AdminSyncLogFilter,
+    page: number,
+    limit: number
+  ): Promise<{ data: AdminSyncLogItem[]; total: number }> {
+    const where: Record<string, unknown> = {};
+
+    if (filter.entityType) where.entityType = filter.entityType;
+    if (filter.receiptStatus) where.receiptStatus = filter.receiptStatus;
+    if (filter.processingStatus) where.processingStatus = filter.processingStatus;
+    if (filter.submittedByUserId) where.submittedByUserId = filter.submittedByUserId;
+
+    if (filter.from || filter.to) {
+      where.receivedAt = {
+        ...(filter.from ? { gte: filter.from } : {}),
+        ...(filter.to ? { lte: filter.to } : {}),
+      };
+    }
+
+    const [data, total] = await Promise.all([
+      prisma.syncLog.findMany({
+        where,
+        select: ADMIN_SYNC_LOG_SELECT,
+        orderBy: { receivedAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.syncLog.count({ where }),
+    ]);
+
+    return {
+      data: data as AdminSyncLogItem[],
+      total,
+    };
   }
 }
