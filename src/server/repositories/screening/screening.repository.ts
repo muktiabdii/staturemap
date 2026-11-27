@@ -3,6 +3,13 @@ import { prisma } from "@/src/lib/prisma";
 import { isUniqueViolation } from "@/src/lib/utils";
 import type { Screening } from "@/src/generated/prisma/client";
 
+// Result row of the RESOLVED screening count grouped by village + classification
+export type AggregationRow = {
+  resolvedRegionId: string;
+  classification: string;
+  count: number;
+};
+
 // Idempotency check result — based on the first ACCEPTED/ALREADY_RECEIVED SyncLog
 export type ScreeningIdempotencyRecord = {
   payloadHash: string;
@@ -47,6 +54,34 @@ export type InsertScreeningResult =
 
 export class ScreeningRepository extends BaseRepository<Screening> {
   protected modelName = "screening";
+
+  /**
+   * Returns RESOLVED screening counts grouped by resolved_region_id and
+   * classification. Only VILLAGE-level regions are used as the grouping key
+   * because resolvedRegionId always points to a VILLAGE (GPS resolution and
+   * MANUAL both resolve to VILLAGE level per domain-rules §5).
+   *
+   * Server-side rollup to higher levels is done by MapService using the
+   * region tree; this method only reads raw VILLAGE-level counts.
+   */
+  async getAggregationByVillage(): Promise<AggregationRow[]> {
+    const groups = await prisma.screening.groupBy({
+      by: ["resolvedRegionId", "classification"],
+      where: {
+        regionResolutionStatus: "RESOLVED",
+        resolvedRegionId: { not: null },
+      },
+      _count: { screeningId: true },
+    });
+
+    return groups
+      .filter((g) => g.resolvedRegionId !== null)
+      .map((g) => ({
+        resolvedRegionId: g.resolvedRegionId!,
+        classification: g.classification,
+        count: g._count.screeningId,
+      }));
+  }
 
   /**
    * Looks up idempotency data for a screeningId by finding the first SyncLog
