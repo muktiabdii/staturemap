@@ -12,3 +12,12 @@ export const getPublicAggregationQuerySchema = z.object({
 });
 
 export type GetPublicAggregationQuery = z.infer<typeof getPublicAggregationQuerySchema>;
+
+// Admin stats query — region_code and date range are optional filters
+export const getAdminStatsQuerySchema = z.object({
+  region_code: z.string().min(1).max(50).optional(),
+  from: z.iso.date({ error: "Format from tidak valid (YYYY-MM-DD)" }).optional(),
+  to: z.iso.date({ error: "Format to tidak valid (YYYY-MM-DD)" }).optional(),
+});
+
+export type GetAdminStatsQuery = z.infer<typeof getAdminStatsQuerySchema>;

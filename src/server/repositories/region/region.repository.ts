@@ -75,4 +75,43 @@ export class RegionRepository extends BaseRepository {
 
     return collected.reverse();
   }
+
+  /**
+   * Returns all descendant region IDs under the given region ID (inclusive).
+   * Used by admin stats to resolve a filter region_code to the full set of
+   * region UUIDs to filter screenings by resolvedRegionId.
+   *
+   * Loads the full region tree once and walks it in memory — same approach
+   * as MapService.getPublicAggregation().
+   */
+  async getDescendantIds(rootRegionCode: string): Promise<string[]> {
+    const root = await this.findByCode(rootRegionCode);
+    if (!root) return [];
+
+    const allRegions = await prisma.administrativeRegion.findMany({
+      select: { id: true, parentId: true },
+    });
+
+    // Build parent → children map
+    const childrenOf = new Map<string, string[]>();
+    for (const r of allRegions) {
+      if (r.parentId) {
+        const list = childrenOf.get(r.parentId) ?? [];
+        list.push(r.id);
+        childrenOf.set(r.parentId, list);
+      }
+    }
+
+    // BFS from root to collect all descendant IDs (inclusive of root)
+    const result: string[] = [];
+    const queue: string[] = [root.id];
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      result.push(id);
+      const kids = childrenOf.get(id) ?? [];
+      queue.push(...kids);
+    }
+
+    return result;
+  }
 }

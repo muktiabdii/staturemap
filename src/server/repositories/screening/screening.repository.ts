@@ -10,6 +10,23 @@ export type AggregationRow = {
   count: number;
 };
 
+// Admin stats filters
+export type AdminStatsFilter = {
+  resolvedRegionIds?: string[];  // pre-computed descendant IDs from region filter
+  from?: Date;
+  to?: Date;
+};
+
+// Admin stats result
+export type AdminStatsResult = {
+  total_screenings: number;
+  resolved_screenings: number;
+  classification: Record<string, number>;
+  total_children: number;
+  active_children: number;
+  inactive_children: number;
+};
+
 // Idempotency check result — based on the first ACCEPTED/ALREADY_RECEIVED SyncLog
 export type ScreeningIdempotencyRecord = {
   payloadHash: string;
@@ -81,6 +98,96 @@ export class ScreeningRepository extends BaseRepository<Screening> {
         classification: g.classification,
         count: g._count.screeningId,
       }));
+  }
+
+  /**
+   * Returns aggregate statistics for Admin dashboard.
+   *
+   * - total_screenings: all screenings regardless of resolution status.
+   * - resolved_screenings: only RESOLVED (the ones that count for maps).
+   * - classification: distribution over RESOLVED screenings only.
+   * - total/active/inactive children: counts from the children table.
+   *
+   * Filters (all optional):
+   * - resolvedRegionIds: pre-computed set of region UUIDs; filters by
+   *   resolvedRegionId IN (...) for resolved stats, and assignedRegionId IN (...)
+   *   for child stats.
+   * - from / to: screened_at range filter, applied to all screening counts.
+   *
+   * Child counts use assignedRegionId which is set to the Nakes's work region
+   * at the time of creation — this is the best available regional association
+   * for children (there is no "region filter" on the child itself).
+   */
+  async getAdminStats(filter: AdminStatsFilter): Promise<AdminStatsResult> {
+    const dateWhere = {
+      ...(filter.from ? { gte: filter.from } : {}),
+      ...(filter.to ? { lte: filter.to } : {}),
+    };
+    const hasDateFilter = Object.keys(dateWhere).length > 0;
+    const hasRegionFilter = filter.resolvedRegionIds && filter.resolvedRegionIds.length > 0;
+
+    // Screening where clause — base (for total_screenings)
+    const baseScreeningWhere: Record<string, unknown> = {};
+    if (hasDateFilter) baseScreeningWhere.screenedAt = dateWhere;
+
+    // Resolved screening where clause — adds RESOLVED + region filter
+    const resolvedScreeningWhere: Record<string, unknown> = {
+      ...baseScreeningWhere,
+      regionResolutionStatus: "RESOLVED",
+    };
+    if (hasRegionFilter) {
+      resolvedScreeningWhere.resolvedRegionId = { in: filter.resolvedRegionIds };
+    }
+
+    // For total_screenings with region filter: filter by resolvedRegionId too
+    // (unresolved screenings in that region are still counted in total)
+    // — but region-unresolved screenings have no region to filter on.
+    // Decision: total_screenings with region filter only counts screenings that
+    // have been resolved to that region (consistent with resolved_screenings).
+    const totalScreeningWhere = hasRegionFilter ? resolvedScreeningWhere : baseScreeningWhere;
+
+    // Child where clause
+    const childWhere: Record<string, unknown> = {};
+    if (hasRegionFilter) {
+      childWhere.assignedRegionId = { in: filter.resolvedRegionIds };
+    }
+
+    // Run all queries in parallel
+    const [
+      totalScreenings,
+      classificationGroups,
+      totalChildren,
+      activeChildren,
+    ] = await Promise.all([
+      prisma.screening.count({ where: totalScreeningWhere }),
+      prisma.screening.groupBy({
+        by: ["classification"],
+        where: resolvedScreeningWhere,
+        _count: { screeningId: true },
+      }),
+      prisma.child.count({ where: childWhere }),
+      prisma.child.count({ where: { ...childWhere, recordStatus: "ACTIVE" } }),
+    ]);
+
+    // resolved_screenings is the sum of groupBy counts (same where)
+    const resolvedScreenings = classificationGroups.reduce(
+      (sum, g) => sum + g._count.screeningId,
+      0
+    );
+
+    const classification: Record<string, number> = {};
+    for (const g of classificationGroups) {
+      classification[g.classification] = g._count.screeningId;
+    }
+
+    return {
+      total_screenings: totalScreenings,
+      resolved_screenings: resolvedScreenings,
+      classification,
+      total_children: totalChildren,
+      active_children: activeChildren,
+      inactive_children: totalChildren - activeChildren,
+    };
   }
 
   /**
