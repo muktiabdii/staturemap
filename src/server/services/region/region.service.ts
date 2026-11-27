@@ -26,7 +26,6 @@ export class RegionService {
     const serverVersion = await regionRepo.getDataVersion();
 
     if (!serverVersion) {
-      // Table is empty — return empty list with a stable placeholder version
       const emptyVersion = "0";
       if (clientVersion === emptyVersion) return { upToDate: true };
       return { upToDate: false, version: emptyVersion, regions: [] };
